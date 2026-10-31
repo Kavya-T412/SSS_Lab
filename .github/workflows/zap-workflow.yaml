@@ -1,0 +1,49 @@
+
+name: Security CI-CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Download source code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Step 3: Install dependencies
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # Step 4: Start application
+      - name: Start Flask Application
+        run: |
+          python app.py > app.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:5000/health; then
+              break
+            fi
+            sleep 2
+          done
+
+      # Step 5: Run OWASP ZAP scan
+      - name: OWASP ZAP Security Scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: 'http://127.0.0.1:5000'
+          artifact_name: zap-report
+          allow_issue_writing: false
+          fail_action: false
